@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 
 void main() {
   runApp(MyApp());
@@ -48,9 +48,15 @@ class _PdfHomePageState extends State<PdfHomePage> {
           ? Center(
               child: Text("No PDF Selected"),
             )
-          : SfPdfViewer.file(
-              pdfFile!,
-              pageLayoutMode: PdfPageLayoutMode.continuous,
+          : PDFView(
+              filePath: pdfFile!.path,
+              enableSwipe: true,
+              swipeHorizontal: false,
+              autoSpacing: true,
+              pageFling: true,
+              pageSnap: true,
+              defaultPage: 0,
+              fitPolicy: FitPolicy.BOTH,
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: pickPDF,
