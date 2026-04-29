@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PdfReaderScreen extends StatefulWidget {
@@ -13,16 +12,19 @@ class PdfReaderScreen extends StatefulWidget {
 }
 
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
-  final PdfViewerController _controller = PdfViewerController();
-  bool isRTL = true;
-  int currentPage = 1;
+  int currentPage = 0;
+  int totalPages = 0;
+  bool isReady = false;
+  bool isRTL = true; // 👈 RTL default
+
+  late PDFViewController _pdfController;
 
   Future<void> saveBookmark() async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setInt(widget.path, currentPage);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Bookmark saved (Page $currentPage)")),
+      SnackBar(content: Text("Bookmark saved (Page ${currentPage + 1})")),
     );
   }
 
@@ -31,14 +33,26 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     int? page = prefs.getInt(widget.path);
 
     if (page != null) {
-      _controller.jumpToPage(page);
+      currentPage = page;
     }
   }
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(Duration(milliseconds: 500), loadBookmark);
+    loadBookmark();
+  }
+
+  void nextPage() async {
+    if (_pdfController != null && currentPage < totalPages - 1) {
+      await _pdfController.setPage(currentPage + 1);
+    }
+  }
+
+  void previousPage() async {
+    if (_pdfController != null && currentPage > 0) {
+      await _pdfController.setPage(currentPage - 1);
+    }
   }
 
   @override
@@ -55,27 +69,65 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             icon: Icon(Icons.swap_horiz),
             onPressed: () {
               setState(() {
-                isRTL = !isRTL;
+                isRTL = !isRTL; // 👈 switch RTL/LTR
               });
             },
           ),
         ],
       ),
-      body: Directionality(
-        textDirection: isRTL ? TextDirection.rtl : TextDirection.ltr,
-        child: SfPdfViewer.file(
-          File(widget.path),
 
-          controller: _controller,
+      body: GestureDetector(
+        onHorizontalDragEnd: (details) {
+          if (isRTL) {
+            // 🔥 RTL mode
+            if (details.primaryVelocity! > 0) {
+              nextPage(); // swipe right → next
+            } else {
+              previousPage(); // swipe left → prev
+            }
+          } else {
+            // 🔥 LTR mode
+            if (details.primaryVelocity! > 0) {
+              previousPage();
+            } else {
+              nextPage();
+            }
+          }
+        },
 
-          scrollDirection: PdfScrollDirection.horizontal,
-          pageLayoutMode: PdfPageLayoutMode.single,
+        child: Stack(
+          children: [
+            PDFView(
+              filePath: widget.path,
 
-          initialZoomLevel: 1.0,
+              swipeHorizontal: false, // ❗ disable default swipe
+              autoSpacing: false,
+              pageFling: false,
 
-          onPageChanged: (details) {
-            currentPage = details.newPageNumber;
-          },
+              fitPolicy: FitPolicy.WIDTH,
+              defaultPage: currentPage,
+
+              onViewCreated: (controller) {
+                _pdfController = controller;
+              },
+
+              onRender: (pages) {
+                setState(() {
+                  totalPages = pages!;
+                  isReady = true;
+                });
+              },
+
+              onPageChanged: (page, total) {
+                setState(() {
+                  currentPage = page!;
+                });
+              },
+            ),
+
+            if (!isReady)
+              Center(child: CircularProgressIndicator()),
+          ],
         ),
       ),
     );

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:io';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'pdf_reader_screen.dart';
 
