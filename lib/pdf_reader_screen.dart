@@ -15,23 +15,24 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   int currentPage = 0;
   int totalPages = 0;
   bool isReady = false;
-  bool isRTL = true; // 👈 RTL default
+  bool isRTL = true;
 
-  late PDFViewController _pdfController;
+  late PDFViewController _controller;
 
+  // 🔖 Save Bookmark
   Future<void> saveBookmark() async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setInt(widget.path, currentPage);
+    await prefs.setInt(widget.path, currentPage);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Bookmark saved (Page ${currentPage + 1})")),
     );
   }
 
+  // 🔖 Load Bookmark
   Future<void> loadBookmark() async {
     final prefs = await SharedPreferences.getInstance();
     int? page = prefs.getInt(widget.path);
-
     if (page != null) {
       currentPage = page;
     }
@@ -43,15 +44,16 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     loadBookmark();
   }
 
+  // 👉 RTL / LTR swipe control
   void nextPage() async {
-    if (_pdfController != null && currentPage < totalPages - 1) {
-      await _pdfController.setPage(currentPage + 1);
+    if (currentPage < totalPages - 1) {
+      await _controller.setPage(currentPage + 1);
     }
   }
 
   void previousPage() async {
-    if (_pdfController != null && currentPage > 0) {
-      await _pdfController.setPage(currentPage - 1);
+    if (currentPage > 0) {
+      await _controller.setPage(currentPage - 1);
     }
   }
 
@@ -69,7 +71,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             icon: Icon(Icons.swap_horiz),
             onPressed: () {
               setState(() {
-                isRTL = !isRTL; // 👈 switch RTL/LTR
+                isRTL = !isRTL;
               });
             },
           ),
@@ -78,15 +80,17 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
       body: GestureDetector(
         onHorizontalDragEnd: (details) {
+          if (!isReady) return;
+
           if (isRTL) {
-            // 🔥 RTL mode
+            // 👉 RTL (Quran style)
             if (details.primaryVelocity! > 0) {
-              nextPage(); // swipe right → next
+              nextPage();
             } else {
-              previousPage(); // swipe left → prev
+              previousPage();
             }
           } else {
-            // 🔥 LTR mode
+            // 👉 LTR
             if (details.primaryVelocity! > 0) {
               previousPage();
             } else {
@@ -95,39 +99,47 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           }
         },
 
-        child: Stack(
-          children: [
-            PDFView(
-              filePath: widget.path,
+        child: Container(
+          margin: EdgeInsets.zero,
+          padding: EdgeInsets.zero,
+          child: Stack(
+            children: [
+              PDFView(
+                filePath: widget.path,
 
-              swipeHorizontal: false, // ❗ disable default swipe
-              autoSpacing: false,
-              pageFling: false,
+                // ❗ vertical mode = better full page fit
+                swipeHorizontal: false,
+                enableSwipe: true,
+                pageFling: false,
+                pageSnap: true,
 
-              fitPolicy: FitPolicy.WIDTH,
-              defaultPage: currentPage,
+                autoSpacing: false,
+                fitPolicy: FitPolicy.WIDTH,
 
-              onViewCreated: (controller) {
-                _pdfController = controller;
-              },
+                defaultPage: currentPage,
 
-              onRender: (pages) {
-                setState(() {
-                  totalPages = pages!;
-                  isReady = true;
-                });
-              },
+                onViewCreated: (controller) {
+                  _controller = controller;
+                },
 
-              onPageChanged: (page, total) {
-                setState(() {
-                  currentPage = page!;
-                });
-              },
-            ),
+                onRender: (pages) {
+                  setState(() {
+                    totalPages = pages!;
+                    isReady = true;
+                  });
+                },
 
-            if (!isReady)
-              Center(child: CircularProgressIndicator()),
-          ],
+                onPageChanged: (page, total) {
+                  setState(() {
+                    currentPage = page!;
+                  });
+                },
+              ),
+
+              if (!isReady)
+                Center(child: CircularProgressIndicator()),
+            ],
+          ),
         ),
       ),
     );
